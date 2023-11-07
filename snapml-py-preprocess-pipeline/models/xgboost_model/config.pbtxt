@@ -1,6 +1,4 @@
-# Copyright contributors to the ai-on-z-triton-is-examples project.
-#
-# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -26,14 +24,14 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-name: "rfc_model_py"
+name: "xgboost_model"
 backend: "python"
 max_batch_size: 32 
 input [
   {
     name: "IN0"
-    data_type: TYPE_FP32
-    dims: [ 30 ]
+    data_type: TYPE_STRING
+    dims: [ 35 ]
   }
 ]
 output [
@@ -46,12 +44,12 @@ output [
 
 instance_group [
   {
-    count: 2
-    kind: KIND_CPU 
+    count:2
+    kind: KIND_CPU
   }
 ]
 
 dynamic_batching {   
-  preferred_batch_size: [ 32 ]
-  max_queue_delay_microseconds: 500
+  preferred_batch_size: [ 12 ]
+  max_queue_delay_microseconds: 2500
 }

@@ -1,5 +1,3 @@
-# Copyright contributors to the ai-on-z-triton-is-examples project.
-# 
 # Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -27,14 +25,20 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import json
-from snapml import RandomForestClassifier as SnapRandomForestClassifier
-import pandas as pd
+import joblib
+from snapml import BoostingMachineClassifier
 import numpy as np
 from pathlib import Path
 import triton_python_backend_utils as pb_utils
+import random
+import string
+import time
+from sklearn.pipeline import Pipeline
+import warnings
+warnings.filterwarnings('ignore')
 
-
-SNAPML_MODEL_FILE = "model.pmml"
+SNAPML_MODEL_FILE = "model_xgb.json"
+SNAPML_MODEL_PREPROCESS_FILE = "pipeline_xgb.joblib"
 
 class TritonPythonModel:
     """Your Python model must use the same class name. Every Python model
@@ -45,7 +49,6 @@ class TritonPythonModel:
         """`initialize` is called only once when the model is being loaded.
         Implementing `initialize` function is optional. This function allows
         the model to intialize any state associated with this model.
-
         Parameters
         ----------
         args : dict
@@ -62,19 +65,23 @@ class TritonPythonModel:
         self.model_config = model_config = json.loads(args['model_config'])
 
         # Get OUT0 configuration
-        output0_config = pb_utils.get_output_config_by_name(
-            model_config, "OUT0")
+        output0_config = pb_utils.get_output_config_by_name(model_config, "OUT0")
 
         # Convert Triton types to numpy types
-        self.output0_dtype = pb_utils.triton_string_to_numpy(
-            output0_config['data_type'])
+        self.output0_dtype = pb_utils.triton_string_to_numpy(output0_config['data_type'])
 
-        curpath = Path(__file__).parent
+        load_path = Path(__file__).parent
 
-        self.snapml_model = SnapRandomForestClassifier()
+        # Load the pipeline
+        self.pipeline = joblib.load(str(load_path / SNAPML_MODEL_PREPROCESS_FILE))
+        self.normalizer = self.pipeline['preprocessor'].transformers_[0][1]['normalizer']
+        self.discretizer = self.pipeline['preprocessor'].transformers_[0][1]['discretizer']
+        self.onehot = self.pipeline['preprocessor'].transformers_[1][1]['onehot']
 
-        self.snapml_model.import_model(str(curpath / SNAPML_MODEL_FILE), 
-                "pmml",tree_format="compress_trees")
+        # Load the model into SnapML
+        self.snap_model = BoostingMachineClassifier()
+        self.snap_model.import_model(str(load_path / SNAPML_MODEL_FILE), 
+                                     input_type="xgb_json", tree_format="compress_trees")
 
     def execute(self, requests):
         """`execute` MUST be implemented in every Python model. `execute`
@@ -85,32 +92,26 @@ class TritonPythonModel:
         Python model, must create one pb_utils.InferenceResponse for every
         pb_utils.InferenceRequest in `requests`. If there is an error, you can
         set the error argument when creating a pb_utils.InferenceResponse
-
         Parameters
         ----------
         requests : list
           A list of pb_utils.InferenceRequest
-
         Returns
         -------
         list
           A list of pb_utils.InferenceResponse. The length of this list must
           be the same as `requests`
         """
-
         output0_dtype = self.output0_dtype
-
         responses = []
         slice_start =  np.zeros((len(requests),), dtype=int)
         slice_end =    np.zeros((len(requests),), dtype=int)
-
 
         # Every Python backend must iterate over everyone of the requests
         # and create a pb_utils.InferenceResponse for each of them.
         req_counter=0
         # stacking the input arrays and prepare for scoring.
         for request in requests:
-            # Get IN0
             in_0 = pb_utils.get_input_tensor_by_name(request, "IN0")
             
             if ( req_counter > 0 ):
@@ -124,16 +125,31 @@ class TritonPythonModel:
                 slice_end[req_counter] = in_0.as_numpy().shape[0]
 
             req_counter+=1
-            
-        # send all stacked input for prediction
-        out_0 = self.snapml_model.predict(array_final)
-         
+        # Define the inference preprocessing steps
+        #n_cat_feats = 20
+        n_num_feats = 15
+
+        num_data = array_final[:,0:n_num_feats].astype(np.float32)
+        cat_data = array_final[:,n_num_feats:].astype('<U4')
+        
+        #transform the data
+        num_data = self.normalizer.transform(num_data)
+        num_data = self.discretizer.transform(num_data)
+
+        cat_data = self.onehot.transform(cat_data)
+
+        X_test =  np.concatenate((num_data, cat_data), axis=1)
+       
+        out_0 = self.snap_model.predict(X_test)
+        out_0[out_0 < 0] = 0
+        out_0[out_0 > 0] = 1
+
+        
         res_counter=0
         # objects to create pb_utils.InferenceResponse.
         for request in requests:
             out_tensor_0 = pb_utils.Tensor("OUT0",
                 out_0[slice_start[res_counter]:slice_end[res_counter]].astype(output0_dtype)) 
-
             # Create InferenceResponse. You can set an error here in case
             # there was a problem with handling this inference request.
             # Below is an example of how you can set errors in inference
