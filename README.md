@@ -21,9 +21,9 @@ This example solves the MNIST Handwritten digit classification problem by using 
 ## Step 4 - Model Inferencing using the Triton Inference Server
 
 ### Option 1: Use sample python script
-- Run python script from terminal
+- Run python script from terminal with ip/port of triton inference server
     ```
-    python test-inferencing/inference_request.py
+    python test-inferencing/inference_request.py <ip:port>
     ```
 
 ### Option 2: Use JMeter
