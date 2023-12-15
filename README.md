@@ -1,41 +1,77 @@
-# Demonstrating inference pipeline creation using triton inference server on IBM zSystems and LinuxONE. 
+# Triton Inference Server with zDLC and Python Preprocessing
+This example solves the MNIST Handwritten digit classification problem by using the zDLC and Triton Inference Server with an ensemble preprocessing approach.
 
-## 1. Scope
+![architecture](./imgs/architecture.png)
 
-The purpose of this project is to provide to sample artifacts to create inference pipeline using triton inference server on IBM zSystems and LinuxONE. 
+## Step 1 - Build a model.so using IBM Z Deep Learning Complier
+- Follow [zDLC documentation](https://github.com/IBM/zDLC)
 
-All the materials are provided as examples. Provided dockerfiles build open-source based (not proprietary) images. 
+## Step 2 - Start the Triton Inference Server
+- Pull the image
+    ```
+    docker build -t tis-py .
+    ```
+- Start the Triton Inference server
+    ```
+    docker run --shm-size 1G -u root --rm -p<Expose_HTTP_PORT_NUM>:8000 -v <your volume mount>:/models <triton docker image id> tritonserver --model-repository=/models
+    ```
+    For example:
+    ```
+    docker run --shm-size 1G -u root --rm -p8000:8000 -v//$PWD/ensemble-pipeline/models:/models tis-py tritonserver --model-repository=/models
+    ```
 
-The maintainers of this repository do not assert to be experts in containers or container security.
-Resources include:
-  - [Docker engine security](https://docs.docker.com/engine/security/)
-  - [Dockerfile best practices](https://docs.docker.com/develop/develop-images/dockerfile_best-practices/)
-  - [Docker getting started resources](https://docs.docker.com/get-started/resources/)
+## Step 3 - Model Inferencing using the Triton Inference Server
 
-## 2. Usage
-These build files commonly rely on base images from the [IBM Z and LinuxONE Container Image Registry (ICR) ](https://ibm.github.io/ibm-z-oss-hub/main/main.html).
-This will require free basic authentication. Details can be found at the ICR link above. 
+### Option 1: Use sample python script
+- Run python script from terminal
+    ```
+    python test-inferencing/inference_request.py
+    ```
 
-### Steps to build and run docker image. 
-- Run docker build using the provided dockerfile i.e `docker build -f ./Dockerfile .`. Using a Ubuntu base image, this will create an environment with both specific Triton Server, Python Backend release with SnapML version.
+### Option 2: Use JMeter
+#### Obtain & Install
+1. Verify Java Installation
+    ```
+    java -version
+    ```
+2. Set Java Environment
+    ```
+    export JAVA_HOME=/path/to/java
+    ```
+3. Update PATH to include JAVA_HOME
+    ```
+    export PATH=$PATH:$JAVA_HOME/bin/
+    ```
+3. [Download JMeter from official website](https://jmeter.apache.org/download_jmeter.cgi)
 
-- Create and run a docker container using the image created on the prior step. As part of this step, you should map the required triton server ports to a port on your local system. An example follows: `docker run --shm-size=1g --ulimit memlock=-1  --ulimit stack=67108864 --rm -p8000:8000 -p8001:8001 -p8002:8002 -v//<path>/models:/models <imageid> tritonserver --model-repository=/models`. This states the image in interactive mode, tells docker to delete the container upon exit, and publishes container HTTP service port at 8000, GRPC Inference Service at 8001, Metrics Service at 8002.
+#### Usage Guidance
+- Review [helpful quick guide overview](https://www.tutorialspoint.com/jmeter/jmeter_quick_guide.htm) for more details on how to install and run JMeter
+- Open sample [test plan](https://github.ibm.com/AIonZ/triton-zDLC-py-preprocess/blob/main/test-inferencing/Triton_zDLC_Test.jmx) in JMeter
+- Run test plan in JMeter
 
-    `Note:` Please do refer each topic(e.g `snapml-examples` ) inside `ai-on-z-triton-is-examples` to create model reposity for the specific use cases. 
- 
-## 3. Content
+### Option 3: Use GHZ
+#### Obtain & Install
+1. Install Go (prerequisite)
+    ```
+    yum install golang
+    ```
+2. Clone ghz code
+    ```
+    git clone https://github.com/bojand/ghz
+    ```
+3. Build using make
+    ```
+    make build
+    ```
 
-| Folder(topic) | Description   |
-| ------------- | ------------- |
-| snapml-examples     | Serving SnapML models with Triton Inference Server on Linux on IBM zSystems |
+#### Usage Guidance
+1. Run ghz in terminal
+    ```
+    ghz
+    ```
 
-`Note:` We also support [onnxmlir-triton-backend](https://github.com/IBM/onnxmlir-triton-backend) on Linux on IBM zSystems. This backend allows the usage of ONNX MLIR compiled models (model.so) with the Triton Inference Server. 
-
-## 4. Additional resources
-Find out additional resources about Triton Inference Server in the below links. 
-1. [Triton Inference server user guide](https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/index.html)
-2. [Triton Inference server github organization](https://github.com/triton-inference-server)
-
-
-## 5. License
-If you would like to see the detailed LICENSE click [here](LICENSE).
+#### Example with ghz
+1. Run ghz in terminal
+    ```
+    ghz --insecure --proto ./test-inferencing/grpc/grpc_service.proto --call inference.GRPCInferenceService.ModelInfer -B ./test-inferencing/grpc/triton-requests-zdlc.pb 0.0.0.0:8001
+    ```

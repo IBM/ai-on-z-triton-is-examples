@@ -1,0 +1,23 @@
+name: "preprocess"
+backend: "python"
+max_batch_size: 0
+input [
+  {
+    name: "IN0"
+    data_type: TYPE_FP32
+    dims: [ 1, 1, 28, 28 ]
+  }
+]
+output [
+  {
+    name: "Input3"
+    data_type: TYPE_FP32
+    dims: [ 1, 1, 28, 28 ]
+  }
+]
+instance_group [
+    {
+      count: 1
+      kind: KIND_CPU
+    }
+]

@@ -27,14 +27,19 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import json
-from snapml import RandomForestClassifier as SnapRandomForestClassifier
+import joblib
 import pandas as pd
 import numpy as np
 from pathlib import Path
 import triton_python_backend_utils as pb_utils
+import random
+import string
+import time
+import pdb 
+from sklearn.pipeline import Pipeline
+import warnings
+warnings.filterwarnings('ignore')
 
-
-SNAPML_MODEL_FILE = "model.pmml"
 
 class TritonPythonModel:
     """Your Python model must use the same class name. Every Python model
@@ -45,7 +50,6 @@ class TritonPythonModel:
         """`initialize` is called only once when the model is being loaded.
         Implementing `initialize` function is optional. This function allows
         the model to intialize any state associated with this model.
-
         Parameters
         ----------
         args : dict
@@ -63,18 +67,13 @@ class TritonPythonModel:
 
         # Get OUT0 configuration
         output0_config = pb_utils.get_output_config_by_name(
-            model_config, "OUT0")
+            model_config, "Input3")
 
         # Convert Triton types to numpy types
         self.output0_dtype = pb_utils.triton_string_to_numpy(
             output0_config['data_type'])
 
-        curpath = Path(__file__).parent
-
-        self.snapml_model = SnapRandomForestClassifier()
-
-        self.snapml_model.import_model(str(curpath / SNAPML_MODEL_FILE), 
-                "pmml",tree_format="compress_trees")
+        curpath = Path(__file__).parent      
 
     def execute(self, requests):
         """`execute` MUST be implemented in every Python model. `execute`
@@ -85,12 +84,10 @@ class TritonPythonModel:
         Python model, must create one pb_utils.InferenceResponse for every
         pb_utils.InferenceRequest in `requests`. If there is an error, you can
         set the error argument when creating a pb_utils.InferenceResponse
-
         Parameters
         ----------
         requests : list
           A list of pb_utils.InferenceRequest
-
         Returns
         -------
         list
@@ -98,41 +95,12 @@ class TritonPythonModel:
           be the same as `requests`
         """
 
-        output0_dtype = self.output0_dtype
-
         responses = []
-        slice_start =  np.zeros((len(requests),), dtype=int)
-        slice_end =    np.zeros((len(requests),), dtype=int)
 
-
-        # Every Python backend must iterate over everyone of the requests
-        # and create a pb_utils.InferenceResponse for each of them.
-        req_counter=0
-        # stacking the input arrays and prepare for scoring.
-        for request in requests:
-            # Get IN0
-            in_0 = pb_utils.get_input_tensor_by_name(request, "IN0")
-            
-            if ( req_counter > 0 ):
-                array_final = np.concatenate((array_final, in_0.as_numpy()), axis=0)
-                slice_start[req_counter] = slice_end[req_counter-1]
-                slice_end[req_counter] = slice_end[req_counter-1]+in_0.as_numpy().shape[0]
-
-            else:
-                array_final = in_0.as_numpy()
-                slice_start[req_counter] = 0
-                slice_end[req_counter] = in_0.as_numpy().shape[0]
-
-            req_counter+=1
-            
-        # send all stacked input for prediction
-        out_0 = self.snapml_model.predict(array_final)
-         
-        res_counter=0
         # objects to create pb_utils.InferenceResponse.
         for request in requests:
-            out_tensor_0 = pb_utils.Tensor("OUT0",
-                out_0[slice_start[res_counter]:slice_end[res_counter]].astype(output0_dtype)) 
+
+            #in_0 = pb_utils.get_input_tensor_by_name(request, "IN0")
 
             # Create InferenceResponse. You can set an error here in case
             # there was a problem with handling this inference request.
@@ -141,13 +109,19 @@ class TritonPythonModel:
             #
             # pb_utils.InferenceResponse(
             #    output_tensors=..., TritonError("An error occured"))
-            inference_response = pb_utils.InferenceResponse(
-                output_tensors=[out_tensor_0])
-            responses.append(inference_response)
-            res_counter+=1 
+            #inference_response = pb_utils.InferenceResponse(
+            #    output_tensors=[in_0])
+            #responses.append(inference_response)
 
-        # You should return a list of pb_utils.InferenceResponse. Length
-        # of this list must match the length of `requests` list.
+            # You should return a list of pb_utils.InferenceResponse. Length
+            # of this list must match the length of `requests` list.
+
+            output_dtype = self.output0_dtype
+            in_0 = pb_utils.get_input_tensor_by_name(request, "IN0")
+            img = in_0.as_numpy()
+            out_tensor = pb_utils.Tensor("Input3", img.astype(output_dtype))
+        
+            responses.append(pb_utils.InferenceResponse(output_tensors=[out_tensor]))
         return responses
 
     def finalize(self):

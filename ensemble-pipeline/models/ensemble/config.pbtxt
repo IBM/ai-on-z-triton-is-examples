@@ -1,0 +1,49 @@
+name: "ensemble"
+platform: "ensemble"
+max_batch_size: 0
+input [
+  {
+    name: "IN0"
+    data_type: TYPE_FP32
+    dims: [ 1, 1, 28, 28 ]
+  }
+]
+output [
+  {
+    name: "Plus214_Output_0"
+    data_type: TYPE_FP32
+    dims: [1, 10]
+  }
+]
+
+#Type of scheduler to be used
+ensemble_scheduling {
+  step [
+    {
+      model_name: "preprocess"
+      input_map 
+      {
+          key: "IN0"
+          value: "IN0"
+      }
+      output_map 
+      {
+          key: "Input3"
+          value: "Input3"
+      }
+    },
+    {
+      model_name: "mnist-12"
+      input_map 
+      {
+          key: "Input3"
+          value: "Input3"
+      }
+      output_map 
+      {
+          key: "Plus214_Output_0"
+          value: "Plus214_Output_0"
+      }
+    }
+  ]
+}
