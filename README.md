@@ -6,21 +6,19 @@ This example solves the MNIST Handwritten digit classification problem by using 
 ## Step 1 - Build a model.so using IBM Z Deep Learning Complier
 - Follow [zDLC documentation](https://github.com/IBM/zDLC)
 
-## Step 2 - Start the Triton Inference Server
-- Pull the image
+## Step 2 - Build the Triton Inference Server
+- Build docker image
     ```
     docker build -t tis-py .
     ```
-- Start the Triton Inference server
-    ```
-    docker run --shm-size 1G -u root --rm -p<Expose_HTTP_PORT_NUM>:8000 -v <your volume mount>:/models <triton docker image id> tritonserver --model-repository=/models
-    ```
-    For example:
+
+## Step 3 - Start the Triton Inference Server
+- Run docker container
     ```
     docker run --shm-size 1G -u root --rm -p8000:8000 -v//$PWD/ensemble-pipeline/models:/models tis-py tritonserver --model-repository=/models
     ```
 
-## Step 3 - Model Inferencing using the Triton Inference Server
+## Step 4 - Model Inferencing using the Triton Inference Server
 
 ### Option 1: Use sample python script
 - Run python script from terminal
@@ -71,7 +69,7 @@ This example solves the MNIST Handwritten digit classification problem by using 
     ```
 
 #### Example with ghz
-1. Run ghz in terminal
+1. Run ghz in terminal (example below with ip 0.0.0.0)
     ```
     ghz --insecure --proto ./test-inferencing/grpc/grpc_service.proto --call inference.GRPCInferenceService.ModelInfer -B ./test-inferencing/grpc/triton-requests-zdlc.pb 0.0.0.0:8001
     ```

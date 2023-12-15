@@ -1,7 +1,13 @@
 import requests
 import json
+import sys
 
-url = 'http://9.76.62.14:8000/v2/models/mnist-12/versions/0/infer'
+if len(sys.argv) < 2:
+    exit()
+
+sever_ip_port = sys.argv[1]
+
+url = 'http://' + sever_ip_port + '/v2/models/ensemble/versions/1/infer'
 myobj = {
 	"inputs" : [
 		{
