@@ -1,0 +1,1 @@
+{"inputs":[{"name":"IN0","shape":[1,1],"datatype":"BYTES","data":[["hello"]]}],"outputs":[{"name":"OUT0"}]}
