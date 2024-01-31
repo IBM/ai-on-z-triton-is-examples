@@ -26,3 +26,7 @@ Run command in `grpc-example` dir:
 ```
 python3 json-to-triton-request-data.py -m model_equals_b_bytes -i input_b_bytes.json -d bytes -o triton-request.pb
 ```
+
+## Converting CSV data to TIS JSON data
+1. Update `grpc-example/tis-data.csv` with your data
+2. Run command: `python csv_to_tis_json.py`
